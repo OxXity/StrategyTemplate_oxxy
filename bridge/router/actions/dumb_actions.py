@@ -27,13 +27,30 @@ class DumbActions:
             self.angle_bounds = angle_bounds
 
         def is_defined(self, domain: ActionDomain) -> bool:
-            kick_angle = aux.angle_to_point(domain.robot.get_pos(), self.target_pos)
+            if domain.game_state in (
+                const.State.STOP,
+                const.State.HALT,
+                const.State.TIMEOUT,
+                const.State.PREPARE_KICKOFF,
+                const.State.PREPARE_PENALTY,
+            ):
+                return False
+            if (
+                domain.game_state in (const.State.KICKOFF, const.State.FREE_KICK, const.State.PENALTY)
+                and not domain.we_active
+            ):
+                return False
+            ball = domain.field.ball.get_pos()
+            kick_angle = aux.angle_to_point(ball, self.target_pos)
             is_aligned = (
                 domain.robot.is_kick_aligned_by_angle(kick_angle, angle_bounds=self.angle_bounds)
                 if self.angle_bounds is not None
-                else domain.robot.is_kick_aligned_by_angle(kick_angle)
+                else domain.robot.is_kick_aligned_by_angle(kick_angle, angle_bounds=0.04)
             )
-            return is_aligned
+            # Enabling the kicker while still orbiting the ball sends it sideways.
+            behind_ball = ball - aux.rotate(aux.RIGHT, kick_angle) * const.KICK_ALIGN_DIST
+            centered = aux.dist_to_line(ball, behind_ball, domain.robot.get_pos(), "S") < const.KICK_ALIGN_OFFSET
+            return is_aligned and centered and domain.field._is_ball_in(domain.robot)
 
         def behavior(self, domain: ActionDomain, current_action: ActionValues) -> None:
             current_action.auto_kick = self.autokick
@@ -53,8 +70,9 @@ class DumbActions:
             if self.pass_pos is not None:
                 self.voltage = get_pass_voltage(aux.dist(domain.field.ball.get_pos(), self.pass_pos), self.is_upper)
 
-            current_action.kicker_voltage = self.voltage
-            # NOTE test 15 when is_pass
+            # Pass calibration must not bypass the division's kick limit.
+            limit = const.VOLTAGE_UP if self.is_upper else const.VOLTAGE_SHOOT
+            current_action.kicker_voltage = min(self.voltage, limit)
 
     class AddFinalVelocityAction(Action):
         """Add velocity in final target"""

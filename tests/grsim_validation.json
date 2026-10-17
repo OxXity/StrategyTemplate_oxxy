@@ -1,0 +1,186 @@
+{
+  "date": "2026-10-17",
+  "environment": "Separate headless grSim; direct UDP vision and commands; real strategy/router/controllers; opponents stationary",
+  "units": {
+    "seconds": "s",
+    "peak_ball_speed": "mm/s, filtered vision estimate",
+    "peak_command_speed": "m/s, requested kick speed"
+  },
+  "unit_tests_passed": 23,
+  "cases": [
+    {
+      "result": "goal",
+      "peak_ball_speed": 1654,
+      "frames": 559,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 12.39,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "attack",
+      "color": "BLUE",
+      "seed": 4,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1676,
+      "frames": 556,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 12.19,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "attack",
+      "color": "BLUE",
+      "seed": 1,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1653,
+      "frames": 558,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 12.24,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "attack",
+      "color": "BLUE",
+      "seed": 8,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1644,
+      "frames": 613,
+      "roles": {
+        "P0": 0,
+        "F_near": 2,
+        "F_far": 1
+      },
+      "seconds": 13.44,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "attack",
+      "color": "YELLOW",
+      "seed": 4,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1686,
+      "frames": 527,
+      "roles": {
+        "P0": 0,
+        "F_near": 1
+      },
+      "seconds": 11.29,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "two",
+      "color": "BLUE",
+      "seed": 4,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1667,
+      "frames": 760,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 16.77,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "defense",
+      "color": "BLUE",
+      "seed": 4,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1668,
+      "frames": 931,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 20.54,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "keeper",
+      "color": "BLUE",
+      "seed": 4,
+      "exit_code": 0
+    },
+    {
+      "result": "goal",
+      "peak_ball_speed": 1667,
+      "frames": 557,
+      "roles": {
+        "P0": 0,
+        "F_near": 1,
+        "F_far": 2
+      },
+      "seconds": 12.53,
+      "phases": [
+        "RECOVER",
+        "PASS_1",
+        "PASS_2",
+        "SHOT"
+      ],
+      "peak_command_speed": 2.4,
+      "scenario": "opponents",
+      "color": "BLUE",
+      "seed": 4,
+      "exit_code": 0
+    }
+  ]
+}

@@ -372,27 +372,24 @@ class Field:
         """
         Определить, движется ли мяч в сторону ворот
         """
-        inter = aux.get_line_intersection(
-            self.ally_goal.center_up,
-            self.ally_goal.center_down,
-            self.ball_start_point,
-            self.ball.get_pos(),
-            "SR",
-        )
-        return inter is not None and self.ball.get_vel().mag() > 100
+        return self._ball_moves_to_goal(self.ally_goal)
 
     def is_ball_moves_to_enemy_goal(self) -> bool:
         """
         Определить, движется ли мяч в сторону ворот
         """
-        inter = aux.get_line_intersection(
-            self.enemy_goal.up,
-            self.enemy_goal.down,
-            self.ball_start_point,
-            self.ball.get_pos(),
-            "SR",
-        )
-        return inter is not None and self.is_ball_moves()
+        return self._ball_moves_to_goal(self.enemy_goal)
+
+    def _ball_moves_to_goal(self, goal: Goal) -> bool:
+        """Intersect the future velocity ray with the mouth, not the penalty width."""
+        ball, velocity = self.ball.get_pos(), self.ball.get_vel()
+        if velocity.mag() <= 100 or abs(velocity.x) < 1e-6:
+            return False
+        arrival = (goal.center.x - ball.x) / velocity.x
+        if arrival <= 0:
+            return False
+        y = ball.y + velocity.y * arrival
+        return min(goal.up.y, goal.down.y) - const.BALL_R <= y <= max(goal.up.y, goal.down.y) + const.BALL_R
 
 
 def find_nearest_robot(point: aux.Point, team: list[rbt.Robot], avoid: Optional[list[int]] = None) -> rbt.Robot:

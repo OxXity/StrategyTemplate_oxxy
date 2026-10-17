@@ -175,14 +175,11 @@ match DIV:
 
 # ROUTE CONSTS
 VIEW_DIST = 2500
-if DIV == Div.C:
-    KEEP_BALL_DIST = 300 + ROBOT_R
-else:
-    KEEP_BALL_DIST = 500 + ROBOT_R
+KEEP_BALL_DIST = 500 + ROBOT_R  # Div C rules 5.1.1: 0.5 m from the robot surface
 
 # is_ball_in
 GRAB_ALIGN_DIST = ROBOT_R + BALL_R
-BALL_GRABBED_DIST = 110
+BALL_GRABBED_DIST = ROBOT_R + BALL_R + 10 if IS_SIMULATOR_USED else 110
 BALL_GRABBED_ANGLE = 0.8
 
 # is_kick_aligned

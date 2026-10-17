@@ -3,7 +3,7 @@ init:
 	pip install -r requirements.txt
 
 test:
-	py.test tests
+	python3 -m unittest discover -s tests -v
 
 syntax:
 	pip install pylint
