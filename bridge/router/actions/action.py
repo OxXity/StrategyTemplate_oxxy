@@ -13,6 +13,7 @@ class ActionValues:
 
     vel = aux.Point(0, 0)
     angle = 0.0
+    max_angular_speed: Optional[float] = None
     kick_up = False
     kick_forward = False
     auto_kick = 0  # 0-lower, 1-upper

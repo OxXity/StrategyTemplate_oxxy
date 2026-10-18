@@ -41,9 +41,19 @@ class FieldCreator(BaseProcessor):
         self.referee_processor = RefereeStateProcessor()
 
     def process(self) -> None:
+        previous_update = self.field.last_update
+        previous_command = self.field.referee_command_counter
         self.process_field()
         cur_state = self.referee_processor.process(self.field)
+        state_changed = (
+            cur_state != (self.field.game_state, self.field.active_team)
+            or previous_command != self.field.referee_command_counter
+        )
         self.field.game_state, self.field.active_team = cur_state
+        if state_changed or self.field.last_update != previous_update:
+            if self.field.last_update == previous_update:
+                self.field.last_update = time()
+            self.field_writer.write(fld.LiteField(self.field))
 
     def process_field(self) -> None:
         """
@@ -203,8 +213,6 @@ class FieldCreator(BaseProcessor):
         self.field.last_update = now
         self.field.field_image.timer.end(time())
 
-        lite_field = fld.LiteField(self.field)
-        self.field_writer.write(lite_field)
         self.image_writer.write(self.field.field_image)
 
 

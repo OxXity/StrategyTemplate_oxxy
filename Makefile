@@ -3,7 +3,7 @@ init:
 	pip install -r requirements.txt
 
 test:
-	python3 -m unittest discover -s tests -v
+	$(PYTHON) -m unittest discover -s tests -v
 
 syntax:
 	pip install pylint
@@ -18,7 +18,18 @@ auto_format:
 	pre-commit install
 	pre-commit run -a
 
-run:
-	python3 main.py
+PYTHON ?= venv/bin/python
 
-.PHONY: init test syntax
+run:
+	$(PYTHON) main.py
+
+run-real:
+	IS_SIMULATOR_USED=False DEBUG_MODE=False $(PYTHON) main.py
+
+run-sim:
+	IS_SIMULATOR_USED=True DEBUG_MODE=False $(PYTHON) main.py
+
+run-sim-debug:
+	IS_SIMULATOR_USED=True DEBUG_MODE=True DEBUG_GAME_STATE=RUN $(PYTHON) main.py
+
+.PHONY: init test syntax run run-real run-sim run-sim-debug

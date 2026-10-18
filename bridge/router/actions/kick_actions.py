@@ -46,17 +46,23 @@ class KickActions:
             is_upper: bool = False,
             *,
             perform_ball_placement: bool = False,
+            max_angular_speed: Optional[float] = None,
         ):
             super().__init__(target_pos, voltage, is_pass, is_upper)
 
             self.perform_ball_placement = perform_ball_placement
+            self.max_angular_speed = max_angular_speed
 
         def use_behavior_of(self, domain: ActionDomain, current_action: ActionValues) -> list["Action"]:
 
             kick_angle = aux.angle_to_point(domain.field.ball.get_pos(), self.target_pos)
 
             actions = [
-                Actions.BallGrab(kick_angle, perform_ball_placement=self.perform_ball_placement),
+                Actions.BallGrab(
+                    kick_angle,
+                    perform_ball_placement=self.perform_ball_placement,
+                    max_angular_speed=self.max_angular_speed,
+                ),
                 DumbActions.ShootAction(self.target_pos, self.is_upper),
                 DumbActions.ControlVoltageAction(self.voltage, self.pass_pos, self.is_upper),
             ]

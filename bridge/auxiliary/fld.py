@@ -89,6 +89,7 @@ class Field:
         определения скоростей и ускорений в первые секунды
         """
         self.game_state: const.State = const.State.STOP
+        self.referee_command_counter: Optional[int] = None
         self.active_team: const.Color = const.Color.ALL
         self.ball_placement_pos: Optional[aux.Point] = None
 
@@ -223,6 +224,7 @@ class Field:
     def update_field(self, new_field: "LiteField") -> None:
         """update with data from new_field"""
         self.game_state = new_field.game_state
+        self.referee_command_counter = new_field.referee_command_counter
         self.active_team = new_field.active_team
         self.ball_placement_pos = new_field.ball_placement_pos
         self.start_dribbling_point = new_field.start_dribbling_point
@@ -471,6 +473,7 @@ class LiteField:
 
     def __init__(self, field: Field) -> None:
         self.game_state: const.State = field.game_state
+        self.referee_command_counter = field.referee_command_counter
         self.active_team: const.Color = field.active_team
         self.ball_placement_pos: Optional[aux.Point] = field.ball_placement_pos
         self.start_dribbling_point: Optional[aux.Point] = field.start_dribbling_point

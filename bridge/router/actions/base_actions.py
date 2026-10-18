@@ -33,6 +33,12 @@ class Actions:
             current_action.vel = aux.Point(0, 0)
             current_action.angle = 0.0
             current_action.beep = 1
+            current_action.max_angular_speed = None
+            current_action.auto_kick = 0
+            current_action.kick_up = False
+            current_action.kick_forward = False
+            current_action.kicker_voltage = 0
+            current_action.dribbler_speed = 0
 
     class GoToPointIgnore(Action):
         """Go to point ignore obstacles"""
@@ -118,7 +124,8 @@ class Actions:
         def use_behavior_of(self, domain: ActionDomain, current_action: ActionValues) -> list["Action"]:
             avoid_ball = (
                 domain.game_state in [GameStates.STOP, GameStates.PREPARE_KICKOFF]
-                or (domain.game_state in [GameStates.FREE_KICK, GameStates.KICKOFF] and not domain.we_active)
+                or (domain.game_state in [GameStates.FREE_KICK, GameStates.KICKOFF, GameStates.PENALTY] and not domain.we_active)
+                or domain.game_state == GameStates.PREPARE_PENALTY
                 or (domain.game_state == GameStates.BALL_PLACEMENT and not self.perform_ball_placement)
             )
             ball_placement_target = domain.field.ball_placement_pos if (not self.perform_ball_placement) else None
@@ -200,16 +207,10 @@ class Actions:
                 self.target_angle,
             )
             current_action.vel = transl_vel
-            if self.max_angular_speed is None:
-                current_action.angle = self.target_angle
-            else:
-                angle_error = aux.wind_down_angle(
-                    self.target_angle - domain.robot.get_angle()
-                )
-                current_action.angle = aux.minmax(angle_error * 4, self.max_angular_speed)
-                # Send a bounded angular velocity for this action instead of
-                # using the faster shared heading controller.
-                current_action.beep = 1
+            current_action.angle = self.target_angle
+            # Translation remains in field coordinates. The command converter
+            # applies this turn limit after rotating velocity into robot axes.
+            current_action.max_angular_speed = self.max_angular_speed
 
             current_action.dribbler_speed = 15
 

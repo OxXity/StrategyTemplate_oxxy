@@ -181,6 +181,10 @@ def command_from_values(field: fld.Field, robot: rbt.Robot, values: ActionValues
         robot.update_vel_xy(values.vel)
         aerr = aux.wind_down_angle(values.angle - robot.get_angle())
         robot.delta_angle = aerr
+        if values.max_angular_speed is not None:
+            # Hardware decoders negate heading errors; angular velocity must
+            # use the same direction as their heading control mode.
+            robot.speed_r = -aux.minmax(4 * aerr, values.max_angular_speed)
 
         reg_vel = aux.Point(robot.speed_x, -robot.speed_y)
         field.router_image.draw_line(
@@ -204,8 +208,8 @@ def command_from_values(field: fld.Field, robot: rbt.Robot, values: ActionValues
         dribbler_setting=values.dribbler_speed,
         forward_vel=robot.speed_x,
         left_vel=-robot.speed_y,
-        angular_vel=robot.speed_r if values.beep else None,
-        angle=robot.delta_angle if not bool(values.beep) else None,
+        angular_vel=robot.speed_r if values.beep or values.max_angular_speed is not None else None,
+        angle=robot.delta_angle if not values.beep and values.max_angular_speed is None else None,
     )
 
 
@@ -215,7 +219,11 @@ def command_from_values_sim(field: fld.Field, robot: rbt.Robot, values: ActionVa
         robot.update_vel_xy(values.vel)
         aerr = aux.wind_down_angle(values.angle - robot.get_angle())
 
-        ang_vel = robot.angle_reg.process(aerr, -robot.get_anglevel())
+        ang_vel = (
+            robot.angle_reg.process(aerr, -robot.get_anglevel())
+            if values.max_angular_speed is None
+            else aux.minmax(4 * aerr, values.max_angular_speed)
+        )
         robot.speed_r = ang_vel
 
         reg_vel = aux.Point(robot.speed_x, -robot.speed_y)

@@ -22,12 +22,13 @@ class Command(Enum):
     STOP = 1
     FORCE_START = 2
     TIMEOUT = 3
+    POST_GAME = 4
     PREPARE_KICKOFF = 5
     NORMAL_START = 6
     PREPARE_PENALTY = 7
-    NORMAL_START2 = 8  # я не понимаю почему они разные ну ладно..
+    NORMAL_START2 = 8
     FREE_KICK = 9
-    CONTINUE = 10  # не факт, что правда
+    INDIRECT_FREE = 10
     BALL_PLACEMENT = 11
 
     BALL_MOVED = 101
@@ -50,32 +51,25 @@ class StateMachine:
         self.__transitions: dict = {}
         self.__active = const.Color.ALL
 
-        self.add_transition(State.HALT, State.STOP, Command.STOP)
-        self.add_transition(State.HALT, State.RUN, Command.FORCE_START)
-        self.add_transition(State.HALT, State.FREE_KICK, Command.FREE_KICK)
-        self.add_transition(State.HALT, State.PREPARE_KICKOFF, Command.PREPARE_KICKOFF)
-        self.add_transition(State.HALT, State.PREPARE_PENALTY, Command.PREPARE_PENALTY)
-        self.add_transition(State.HALT, State.KICKOFF, Command.NORMAL_START)
-
+        # TransNet publishes the current referee state, including when this
+        # process joins an already running match or misses a preparation packet.
+        referee_states = {
+            Command.HALT: State.HALT,
+            Command.STOP: State.STOP,
+            Command.FORCE_START: State.RUN,
+            Command.TIMEOUT: State.TIMEOUT,
+            Command.POST_GAME: State.HALT,
+            Command.PREPARE_KICKOFF: State.PREPARE_KICKOFF,
+            Command.NORMAL_START: State.KICKOFF,
+            Command.PREPARE_PENALTY: State.PREPARE_PENALTY,
+            Command.NORMAL_START2: State.PENALTY,
+            Command.FREE_KICK: State.FREE_KICK,
+            Command.INDIRECT_FREE: State.FREE_KICK,
+            Command.BALL_PLACEMENT: State.BALL_PLACEMENT,
+        }
         for state in State:
-            self.add_transition(state, State.HALT, Command.HALT)
-            self.add_transition(state, State.STOP, Command.STOP)
-            self.add_transition(state, State.TIMEOUT, Command.TIMEOUT)
-            self.add_transition(state, State.BALL_PLACEMENT, Command.BALL_PLACEMENT)
-
-        self.add_transition(State.STOP, State.PREPARE_KICKOFF, Command.PREPARE_KICKOFF)
-        self.add_transition(State.STOP, State.BALL_PLACEMENT, Command.BALL_PLACEMENT)
-        self.add_transition(State.STOP, State.PREPARE_PENALTY, Command.PREPARE_PENALTY)
-        self.add_transition(State.STOP, State.FREE_KICK, Command.FREE_KICK)
-        self.add_transition(State.STOP, State.RUN, Command.FORCE_START)
-
-        self.add_transition(State.PREPARE_KICKOFF, State.KICKOFF, Command.NORMAL_START)
-
-        self.add_transition(State.BALL_PLACEMENT, State.FREE_KICK, Command.CONTINUE)
-        self.add_transition(State.BALL_PLACEMENT, State.FREE_KICK, Command.FREE_KICK)
-        self.add_transition(State.BALL_PLACEMENT, State.STOP, Command.STOP)
-
-        self.add_transition(State.PREPARE_PENALTY, State.PENALTY, Command.NORMAL_START2)
+            for command, target in referee_states.items():
+                self.add_transition(state, target, command)
 
         self.add_transition(State.PENALTY, State.STOP, Command.PASS_10_SECONDS)
 
@@ -95,7 +89,11 @@ class StateMachine:
 
     def make_transition(self, transition: int) -> None:
         """Make a transition (for user)"""
-        self.make_transition_(CommandMap.get(transition))
+        command = CommandMap.get(transition)
+        if command is None:
+            self.__state = State.HALT
+            return
+        self.make_transition_(command)
 
     def make_transition_(self, transition: Optional[Command]) -> None:
         """Make a transition (for the program)"""
@@ -162,6 +160,8 @@ class RefereeStateProcessor:
         # Referee fields
         self.state_machine = StateMachine()
         self.cur_cmd_state: Optional[int] = None
+        self.cur_command_key: Optional[tuple] = None
+        self.restart_team = const.Color.ALL.value
         self.wait_10_sec_flag: bool = False
         self.wait_10_sec: float = 0.0
         self.wait_ball_moved_flag: bool = False
@@ -177,8 +177,7 @@ class RefereeStateProcessor:
                 State.FREE_KICK,
                 State.PENALTY,
             ]:
-                if self.debug_game_state != State.FREE_KICK:
-                    self.state_machine.active_team(self.debug_active_team.value)
+                self.state_machine.active_team(self.debug_active_team.value)
 
                 self.preparation_flag = True
                 self.preparation_timer = time()
@@ -209,14 +208,26 @@ class RefereeStateProcessor:
                 ball_pos=parsed_message.get("ball_pos", None),
             )
 
-            if cur_command.state != self.cur_cmd_state:
+            # Old relays may omit the team on NORMAL_START; preserve the last
+            # preparation's team. New relays also forward command_counter.
+            team = cur_command.commandForTeam
+            if cur_command.state in (Command.NORMAL_START.value, Command.NORMAL_START2.value) and team == 0:
+                team = self.restart_team
+            command_key = (cur_command.state, team, parsed_message.get("command_counter"))
+            if command_key != self.cur_command_key:
+                field.referee_command_counter = parsed_message.get("command_counter")
                 self.state_machine.make_transition(cur_command.state)
-                self.state_machine.active_team(cur_command.commandForTeam)
+                self.state_machine.active_team(team)
                 self.cur_cmd_state = cur_command.state
+                self.cur_command_key = command_key
                 cur_state, _ = self.state_machine.get_state()
+                if cur_state in (State.PREPARE_KICKOFF, State.PREPARE_PENALTY, State.KICKOFF, State.PENALTY):
+                    self.restart_team = team
+                else:
+                    self.restart_team = 0
 
                 if cur_state == State.BALL_PLACEMENT:
-                    ball_info: Optional[tuple[float, float]] = parsed_message["ball_pos"]
+                    ball_info: Optional[tuple[float, float]] = parsed_message.get("ball_pos")
                     field.ball_placement_pos = aux.Point(ball_info[0], ball_info[1]) if ball_info is not None else None
                 else:
                     field.ball_placement_pos = None
@@ -229,8 +240,7 @@ class RefereeStateProcessor:
         elif self.debug_mode and self.debug_game_state == State.BALL_PLACEMENT:
             field.ball_placement_pos = aux.Point(0, 0)
 
-        # TODO add " if self.debug_mode" here and test it
-        elif self.preparation_flag and time() - self.preparation_timer > self.debug_preparation_delay:
+        elif self.debug_mode and self.preparation_flag and time() - self.preparation_timer > self.debug_preparation_delay:
             self.state_machine.set_state(self.debug_game_state)
             self.state_machine.active_team(self.debug_active_team.value)
 

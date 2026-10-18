@@ -133,6 +133,21 @@ class BallControlTests(unittest.TestCase):
             self.strategy.is_pass_blocked(self.field, self.field.ball.get_pos(), target)
         )
 
+    def test_shot_selector_uses_corner_when_keeper_blocks_center(self):
+        self.field.ball._pos = aux.Point(1000, 0)
+        keeper = self.field.enemies[self.field.enemy_gk_id]
+        keeper.used(1)
+        keeper._pos = aux.Point(self.field.enemy_goal.center.x - 50, 0)
+
+        self.assertTrue(self.strategy.is_pass_blocked(
+            self.field, self.field.ball.get_pos(), self.field.enemy_goal.center
+        ))
+        target = self.strategy.choose_shot_target(self.field)
+        self.assertNotEqual(target.y, self.field.enemy_goal.center.y)
+        self.assertFalse(self.strategy.is_pass_blocked(
+            self.field, self.field.ball.get_pos(), target
+        ))
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -18,6 +18,7 @@ PASS_BLOCK_DIST = 2 * const.ROBOT_R + const.BALL_R
 POST_MARGIN = 100
 MAX_ATTACK_PASSES = 5
 TURN_WITH_BALL_MAX_SPEED = 250
+TURN_WITH_BALL_MAX_ANGULAR_SPEED = 3.0
 KICK_ALIGNMENT_MAX_SPEED = 500
 FIELD_MARGIN = 2 * const.ROBOT_R
 COLLECTOR_HYST = 250
@@ -54,6 +55,7 @@ class Strategy:
         self.clock = clock
         self.rng = rng if rng is not None else random.Random()
         self.we_active = False
+        self.active_team_initialized = False
         self.mode = "DEFENSE"
         self.attack_phase = "RECOVER"
         self.roles: dict[str, int] = {}
@@ -64,34 +66,155 @@ class Strategy:
         self.collector: Optional[int] = None
         self.roster: tuple[int, ...] = ()
         self.triangle_side = 1
+        self.restart_key: Optional[tuple] = None
+        self.restart_kicker: Optional[int] = None
 
     def process(self, field: fld.Field) -> list[Optional[Action]]:
         """Build commands for the current referee state."""
-        self.we_active = field.active_team in (const.Color.ALL, field.ally_color)
+        # The referee may clear active_team during a kickoff or penalty start.
+        # Keep the owner learned during preparation until play leaves that state.
+        if (
+            field.game_state not in (GameStates.KICKOFF, GameStates.PENALTY)
+            or not self.active_team_initialized
+        ):
+            self.we_active = field.active_team in (const.Color.ALL, field.ally_color)
+            self.active_team_initialized = True
+
         if field.game_state == GameStates.HALT:
             self.reset_attack()
+            self.restart_key = None
+            self.restart_kicker = None
             self.mode = "DEFENSE"
             self.last_touch = None
+            self.draw_state(field)
             return [Actions.Stop()] * const.TEAM_ROBOTS_MAX_COUNT
 
         actions: list[Optional[Action]] = [None] * const.TEAM_ROBOTS_MAX_COUNT
         for robot in field.active_allies(True):
             actions[robot.r_id] = Actions.Stop()
-        if field.game_state == GameStates.RUN:
-            self.run(field, actions)
-        else:
-            self.reset_attack()
-            self.mode = "DEFENSE"
-            self.last_touch = None
-            if field.game_state == GameStates.STOP:
-                gk = field.allies[field.gk_id]
-                if gk.is_used():
-                    point = self.keeper_point(field)
-                    actions[gk.r_id] = Actions.GoToPoint(
-                        point, aux.angle_to_point(point, field.ball.get_pos())
-                    )
+        match field.game_state:
+            case GameStates.RUN:
+                self.restart_key = None
+                self.restart_kicker = None
+                self.run(field, actions)
+            case GameStates.TIMEOUT:
+                self.reset_attack()
+                self.restart_key = None
+                self.restart_kicker = None
+                self.mode = "DEFENSE"
+                self.last_touch = None
+            case GameStates.PREPARE_KICKOFF | GameStates.KICKOFF:
+                self.run_restart(field, actions)
+            case GameStates.PREPARE_PENALTY | GameStates.PENALTY:
+                self.run_restart(field, actions)
+            case GameStates.FREE_KICK:
+                self.run_restart(field, actions)
+            case GameStates.STOP:
+                # Normal movement is legal; the router keeps players clear of the ball.
+                self.run(field, actions)
+            case GameStates.BALL_PLACEMENT:
+                self.reset_attack()
+                self.restart_key = None
+                self.restart_kicker = None
+                self.mode = "DEFENSE"
+                self.last_touch = None
                 self.cover_pass_lines(field, field.active_allies(False), actions)
+            case GameStates.DEBUG:
+                pass
+            case _:
+                self.reset_attack()
+                self.restart_key = None
+                self.restart_kicker = None
+                self.mode = "DEFENSE"
+                self.last_touch = None
+        self.draw_state(field)
         return actions
+
+    def run_restart(self, field: fld.Field, actions: list[Optional[Action]]) -> None:
+        """Prepare a restart, then let only its designated team take the kick."""
+        # ALL cannot identify a restart owner, unlike ordinary RUN play.
+        ours = self.we_active
+        key = (field.game_state, field.active_team, field.referee_command_counter)
+        players = field.active_allies(False)
+        kickers = players or field.active_allies(True)
+        if key != self.restart_key or (tuple(sorted(robot.r_id for robot in field.active_allies(True))) != self.roster):
+            self.reset_attack()
+            self.generate_attack_points(field)
+            self.restart_key = key
+            self.restart_kicker = (
+                min(kickers, key=lambda robot: aux.dist(robot.get_pos(), field.ball.get_pos())).r_id
+                if ours and kickers
+                else None
+            )
+        self.mode = "ATTACK" if ours else "DEFENSE"
+        self.attack_phase = field.game_state.name
+        ball = field.ball.get_pos()
+        forward = field.ally_goal.eye_forw
+        lateral = aux.Point(-forward.y, forward.x)
+        kickoff = field.game_state in (GameStates.PREPARE_KICKOFF, GameStates.KICKOFF)
+        penalty = field.game_state in (GameStates.PREPARE_PENALTY, GameStates.PENALTY)
+        ready_to_kick = field.game_state in (GameStates.KICKOFF, GameStates.FREE_KICK, GameStates.PENALTY)
+        stations: dict[int, aux.Point] = {}
+        roles_by_id = {r_id: role for role, r_id in self.roles.items()}
+        for index, robot in enumerate(field.active_allies(True)):
+            if robot.r_id == self.restart_kicker:
+                continue
+            if robot.r_id == field.gk_id:
+                point = self.keeper_point(field)
+                if penalty and not ours:
+                    point = aux.Point(field.ally_goal.center.x, point.y)
+            else:
+                side = 1 if index % 2 else -1
+                if kickoff:
+                    point = -forward * 300 + lateral * (side * 850)
+                else:
+                    depth_offset = 700 if ours else -1000
+                    if penalty:
+                        depth_offset = -900 if ours else 900
+                    point = ball + forward * depth_offset + lateral * (side * 800)
+                point = self.safe_point(field, point)
+            stations[robot.r_id] = point
+            if robot.r_id in roles_by_id:
+                self.attack_points[roles_by_id[robot.r_id]] = point
+            actions[robot.r_id] = Actions.GoToPoint(point, aux.angle_to_point(point, ball))
+        if not ours:
+            keeper = field.allies[field.gk_id]
+            if penalty and ready_to_kick and keeper.is_used() and field.is_ball_moves_to_goal():
+                actions[keeper.r_id] = StrategyActions.CatchBall()
+            return
+        if self.restart_kicker is None:
+            return
+        kicker = field.allies[self.restart_kicker]
+        if ready_to_kick and self.drive_transfer(field, actions):
+            return
+        receivers = sorted(
+            (field.allies[r_id] for r_id in stations),
+            key=lambda robot: aux.dist(robot.get_pos(), field.enemy_goal.center),
+        )
+        target = (
+            self.choose_shot_target(field)
+            if penalty
+            else (stations[receivers[0].r_id] if receivers else field.enemy_goal.center)
+        )
+        if not ready_to_kick:
+            point = self.safe_point(field, ball - forward * (const.KEEP_BALL_DIST + 50))
+            actions[kicker.r_id] = Actions.GoToPoint(point, aux.angle_to_point(point, target))
+            return
+        if penalty:
+            self.start_transfer(field, actions, kicker, None, target, "RECOVER")
+            return
+        # Both direct and indirect free kicks start with a pass. This also
+        # prevents an indirect free kick from being sent straight into goal.
+        for receiver in receivers:
+            if (
+                aux.dist(receiver.get_pos(), stations[receiver.r_id]) < RECEIVER_READY_DIST
+                and receiver.get_vel().mag() < 250
+                and abs(aux.wind_down_angle(aux.angle_to_point(receiver.get_pos(), ball) - receiver.get_angle())) < 0.35
+                and not self.is_pass_blocked(field, ball, receiver.get_pos())
+            ):
+                self.start_transfer(field, actions, kicker, receiver.r_id, receiver.get_pos(), "POSSESSION")
+                return
+        actions[kicker.r_id] = self.turn_with_ball(field, kicker, target)
 
     def reset_attack(self) -> None:
         self.attack_phase = "RECOVER"
@@ -108,7 +231,6 @@ class Strategy:
             self.run_attack(field, actions)
         else:
             self.run_defense(field, actions)
-        self.draw_state(field)
 
     def attack_depth(self, field: fld.Field, point: aux.Point) -> float:
         return aux.scal_mult(point, field.ally_goal.eye_forw)
@@ -264,7 +386,7 @@ class Strategy:
     def turn_with_ball(field: fld.Field, robot: rbt.Robot, target: aux.Point) -> Action:
         """Turn while keeping the ball centered in the dribbler with low translation speed."""
         angle = aux.angle_to_point(field.ball.get_pos(), target)
-        return Actions.BallGrab(angle, max_angular_speed=10).compose(
+        return Actions.BallGrab(angle, max_angular_speed=TURN_WITH_BALL_MAX_ANGULAR_SPEED).compose(
             DumbActions.LimitSpeed(TURN_WITH_BALL_MAX_SPEED)
         )
 
@@ -273,7 +395,9 @@ class Strategy:
         field: fld.Field, target: aux.Point, *, is_pass: bool = False
     ) -> Action:
         """Align with the ball under controlled speed, then kick when contact is valid."""
-        return KickActions.Straight(target, is_pass=is_pass).compose(
+        return KickActions.Straight(
+            target, is_pass=is_pass, max_angular_speed=TURN_WITH_BALL_MAX_ANGULAR_SPEED
+        ).compose(
             DumbActions.LimitSpeed(KICK_ALIGNMENT_MAX_SPEED)
         )
 
@@ -688,7 +812,7 @@ class Strategy:
         # central lane or the opposite corner.
         targets = [
             aux.Point(goal.center.x, low_y + (high_y - low_y) * ratio)
-            for ratio in (0.2, 0.4, 0.5, 0.6, 0.8)
+            for ratio in (0.0, 0.25, 0.5, 0.75, 1.0)
         ]
         enemies = field.active_enemies(True)
         ball = field.ball.get_pos()
@@ -702,12 +826,12 @@ class Strategy:
                 default=math.inf,
             )
 
-        # Prefer any actually open lane. Previously, the target with the widest
-        # clearance could still be blocked, causing the caller to reject the
-        # shot even when another sampled point in the goal was open.
+        # Use the open center first, then the widest remaining open lane.
         open_targets = [
             target for target in targets if not self.is_pass_blocked(field, ball, target)
         ]
+        if targets[2] in open_targets:
+            return targets[2]
         candidates = open_targets or targets
         center_y = goal.center.y
         return max(
@@ -762,7 +886,8 @@ class Strategy:
             )
         field.strategy_image.send_telemetry(
             "STRATEGY",
-            f"{self.mode} {self.attack_phase}; roles={self.roles}; "
+            f"game_state={field.game_state.name}; active_team={field.active_team.name}; "
+            f"simulator={const.IS_SIMULATOR_USED}; {self.mode} {self.attack_phase}; roles={self.roles}; "
             f"holder={field.robot_with_ball.r_id if field.robot_with_ball else None}; "
             f"contacts={[r.r_id for r in field.active_allies(True) if field._is_ball_in(r)]}; "
             f"shot={shot_target}; shot_open={shot_open}; "

@@ -1,2 +1,4 @@
 #!/bin/bash
-python3.9 main.py
+set -e
+cd -- "$(dirname -- "$0")/.."
+exec venv/bin/python main.py "$@"
