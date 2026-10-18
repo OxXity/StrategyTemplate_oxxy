@@ -162,9 +162,16 @@ class Actions:
     class BallGrab(Action):
         """Grab ball in a given direction"""
 
-        def __init__(self, target_angle: float, *, perform_ball_placement: bool = False) -> None:
+        def __init__(
+            self,
+            target_angle: float,
+            *,
+            perform_ball_placement: bool = False,
+            max_angular_speed: float | None = None,
+        ) -> None:
             self.target_angle = target_angle
             self.perform_ball_placement = perform_ball_placement
+            self.max_angular_speed = max_angular_speed
 
         def is_defined(self, domain: ActionDomain) -> bool:
             return (
@@ -193,7 +200,16 @@ class Actions:
                 self.target_angle,
             )
             current_action.vel = transl_vel
-            current_action.angle = self.target_angle
+            if self.max_angular_speed is None:
+                current_action.angle = self.target_angle
+            else:
+                angle_error = aux.wind_down_angle(
+                    self.target_angle - domain.robot.get_angle()
+                )
+                current_action.angle = aux.minmax(angle_error * 4, self.max_angular_speed)
+                # Send a bounded angular velocity for this action instead of
+                # using the faster shared heading controller.
+                current_action.beep = 1
 
             current_action.dribbler_speed = 15
 

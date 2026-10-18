@@ -182,5 +182,7 @@
       "seed": 4,
       "exit_code": 0
     }
-  ]
+  ],
+  "status": "historical_only",
+  "warning": "Results apply to the previous fixed two-pass sequence, not the current triangle-and-arc tactic."
 }

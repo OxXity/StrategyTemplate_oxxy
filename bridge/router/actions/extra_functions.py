@@ -11,7 +11,7 @@ def get_pass_voltage(length: float, is_upper: bool) -> int:
         return int(aux.minmax(length / 735 + 3.8, 5, 15))
     else:
         # print(round(aux.minmax(1.13 + math.sqrt(7.87 * length / 1000 + 1.07), 2, 15)))
-        return round(aux.minmax(-2.5 + math.sqrt(0.015 * length + 19.16) + 1, 2, 15))
+        return round(aux.minmax(-1.8 + math.sqrt(0.015 * length + 19.16) + 1, 2, 15))
 
 
 def get_grab_speed(

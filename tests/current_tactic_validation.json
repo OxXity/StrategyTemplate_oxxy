@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-18",
+  "environment": "Separate headless grSim; real strategy, action router and controller; stationary opponents",
+  "scenario": "attack",
+  "color": "BLUE",
+  "seed": 4,
+  "result": "goal",
+  "seconds": 15.61,
+  "frames": 689,
+  "peak_ball_speed_mm_s": 1707,
+  "peak_command_speed_m_s": 2.4,
+  "roles": {
+    "P0": 0,
+    "F_near": 1,
+    "F_far": 2
+  },
+  "pass_count_before_shot": 5,
+  "mirror_check": {
+    "color": "YELLOW",
+    "seed": 4,
+    "result": "goal",
+    "seconds": 5.66,
+    "frames": 250,
+    "peak_ball_speed_mm_s": 1640,
+    "roles": {
+      "P0": 0,
+      "F_near": 2,
+      "F_far": 1
+    },
+    "pass_count_before_shot": 1
+  },
+  "scope": "Two smoke scenarios confirm pickup, controlled attack, the five-pass cap in the BLUE run, and goals for both colors; not a robustness benchmark."
+}
