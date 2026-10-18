@@ -66,8 +66,14 @@ class Strategy:
         self.triangle_side = 1
 
     def process(self, field: fld.Field) -> list[Optional[Action]]:
-        """Replace active commands even on HALT: None leaves the old router action alive."""
+        """Build commands for the current referee state."""
         self.we_active = field.active_team in (const.Color.ALL, field.ally_color)
+        if field.game_state == GameStates.HALT:
+            self.reset_attack()
+            self.mode = "DEFENSE"
+            self.last_touch = None
+            return [Actions.Stop()] * const.TEAM_ROBOTS_MAX_COUNT
+
         actions: list[Optional[Action]] = [None] * const.TEAM_ROBOTS_MAX_COUNT
         for robot in field.active_allies(True):
             actions[robot.r_id] = Actions.Stop()
