@@ -186,14 +186,16 @@ class Attacker:
         world = ctx.world
         ball = world.ball
         best: Optional[Option] = None
+        attack_dir = 0.0 if world.attack_sign > 0 else math.pi
         for k in range(params.DRIBBLE_DIRS):
             angle = 2 * math.pi * k / params.DRIBBLE_DIRS
             if away_from is not None:
                 if angle_diff(angle, angle_to(away_from, ball)) > math.pi / 2:
                     continue
-                attack_dir = 0.0 if world.attack_sign > 0 else math.pi
                 if angle_diff(angle, attack_dir) > params.ESCAPE_MAX_BACK_ANGLE:
                     continue  # не уходить с мячом назад к своим воротам
+            elif angle_diff(angle, attack_dir) > params.DRIBBLE_MAX_ANGLE:
+                continue  # без давления ведём только вперёд, иначе робот возит мяч поперёк поля
             for dist in sorted({min(d, remaining - DRIBBLE_LIMIT_GAP) for d in params.DRIBBLE_DISTS}):
                 if dist < DRIBBLE_MIN_STEP:
                     continue
@@ -226,11 +228,14 @@ class Attacker:
         good_passes = [o for o in passes if o.utility > params.PASS_MIN_VALUE]
         if good_passes:
             return max(good_passes, key=lambda o: o.utility)
-        if escape is not None:
+        if escape is not None and escape.utility > 0:
             return escape
         tap = self._tap_option(robot, ctx)
         if tap is not None and tap.p > 0:
             return tap  # откидка вперёд лучше паса назад
+        weak_shots = [o for o in options if o.kind == "SHOOT" and o.p >= params.SHOT_FALLBACK_MIN_P]
+        if weak_shots:
+            return max(weak_shots, key=lambda o: o.utility)  # удар в сторону ворот лучше беготни с мячом
         if passes:
             return max(passes, key=lambda o: o.utility)
         if tap is not None:
@@ -329,12 +334,15 @@ class Attacker:
         if best_pass is not None and (best is None or best_pass.utility > best.utility + params.PASS_DECISION_GAIN):
             best = best_pass
         dribble = self._dribble_option(robot, ctx, params.DRIBBLE_SOFT_LIMIT - disp)
-        if dribble is not None and (best is None or dribble.utility > best.utility + params.DRIBBLE_MIN_GAIN):
+        if dribble is not None and dribble.utility > 0 and (
+            best is None or dribble.utility > best.utility + params.DRIBBLE_MIN_GAIN
+        ):
             best = dribble
         if best is None:
-            # Ничего хорошего: довернуться с мячом к лучшей цели удара до принудительного выпуска
+            # Ничего хорошего: бить по воротам, а не возить мяч - удар вперёд лучше потери мяча
             shot = evaluation.eval_shot(ctx.world, ctx.world.ball, robot.r_id)
-            best = Option("HOLD", shot.target, 0.0)
+            kind = "SHOOT" if shot.p_goal >= params.SHOT_FALLBACK_MIN_P else "HOLD"
+            best = Option(kind, shot.target, 0.0, p=shot.p_goal)
         return best
 
     def _execute(self, robot: rbt.Robot, ctx: TickContext, option: Option, start_ball: aux.Point) -> Action:

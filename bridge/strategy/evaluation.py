@@ -342,6 +342,9 @@ def _support_candidates(
         mask &= ~((depth < const.GOAL_PEN_DX + margin) & (np.abs(py) < const.GOAL_PEN_DY / 2 + margin))
     ball = world.ball
     mask &= np.hypot(px - ball.x, py - ball.y) >= params.SUPPORT_MIN_DIST_BALL
+    # Не убегать далеко от мяча: иначе каждая смена режима - забег через всё поле
+    mask &= np.hypot(px - ball.x, py - ball.y) <= params.SUPPORT_MAX_DIST_BALL
+    mask &= (px - ball.x) * world.attack_sign <= params.SUPPORT_MAX_AHEAD
     if attacker_pos is not None:
         mask &= np.hypot(px - attacker_pos.x, py - attacker_pos.y) >= params.SUPPORT_MIN_DIST_MATE
     for enemy in world.enemies:
@@ -472,7 +475,9 @@ def _support_point_valid(world: WorldModel, point: aux.Point, attacker_pos: Opti
         return False
     if not ball_in_play and world.in_area(point, False, legality.enemy_area_margin(world.field.game_state)):
         return False
-    if aux.dist(point, world.ball) < params.SUPPORT_MIN_DIST_BALL:
+    if not params.SUPPORT_MIN_DIST_BALL <= aux.dist(point, world.ball) <= params.SUPPORT_MAX_DIST_BALL:
+        return False
+    if world.x_att(point) - world.x_att(world.ball) > params.SUPPORT_MAX_AHEAD:
         return False
     if attacker_pos is not None and aux.dist(point, attacker_pos) < params.SUPPORT_MIN_DIST_MATE:
         return False
