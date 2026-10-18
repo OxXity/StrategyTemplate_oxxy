@@ -15,6 +15,7 @@ from strategy_bridge.processors import BaseProcessor
 from bridge import const, drawing
 from bridge.auxiliary import aux, fld, rbt
 from bridge.processors.python_controller import RobotCommand
+from bridge.router import safety
 from bridge.router.actions import Actions
 from bridge.router.actions.action import Action, ActionDomain, ActionValues
 
@@ -115,8 +116,8 @@ class CommandSink(BaseProcessor):
                     desired_vels[idx] = values.vel
                     action_results[idx] = values
 
-            # Phase 2: Apply Barrier Filter
-            filtered_vels = desired_vels
+            # Phase 2: Apply Barrier Filter (G-9: ограничение скорости сближения с соперниками)
+            filtered_vels = safety.limit_approach_speeds(self.field[color], desired_vels, action_results)
 
             # Phase 3: Generate actual commands
             for idx, action in enumerate(self.processed_actions[color]):

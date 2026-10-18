@@ -88,6 +88,15 @@ class Robot(entity.Entity):
         self.prev_sended_angle = 0.0
         self.prev_ricochet_target: typing.Optional[aux.Point] = None
 
+        # Состояние действий для слабого дриблера (живёт в роутере между тактами, R-4.1, R-4.2, R-4.3)
+        self.carry_angle_sp: typing.Optional[float] = None  # уставка угла рампы
+        self.carry_ang_vel = 0.0  # текущая угловая скорость рампы
+        self.carry_ramp_time = 0.0  # время последнего обновления рампы
+        self.carry_prev_vel: typing.Optional[aux.Point] = None  # прошлая скорость после ограничителя
+        self.carry_vel_time = 0.0
+        self.pivot_point: typing.Optional[aux.Point] = None  # точка мяча для разворота вокруг мяча
+        self.pivot_time = 0.0
+
     def __eq__(self, robo: typing.Any) -> bool:
         if not isinstance(robo, Robot):
             return False
