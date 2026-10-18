@@ -3,6 +3,7 @@ Class with robot actions
 """
 
 from time import time
+from typing import Optional
 
 from bridge import const
 from bridge.auxiliary import aux, tau
@@ -74,13 +75,12 @@ class Actions:
                 prev_vel_abs = (
                     cur_robot.prev_sended_vel
                 )  # aux.rotate(cur_robot.prev_sended_vel, -cur_robot.prev_sended_angle)
-                if (cur_vel_abs - prev_vel_abs).mag() / (
-                    now - cur_robot.prev_sended_time
-                ) > const.MAX_ACCELERATION and cur_vel_abs.mag() > prev_vel_abs.mag():
+                dt = max(now - cur_robot.prev_sended_time, 1e-3)  # два вызова в один момент времени - без деления на 0
+                if (
+                    cur_vel_abs - prev_vel_abs
+                ).mag() / dt > const.MAX_ACCELERATION and cur_vel_abs.mag() > prev_vel_abs.mag():
                     # domain.field.router_image.draw_circle(aux.Point(0, 1000), size_in_mms=200)
-                    current_action.vel = prev_vel_abs + (cur_vel_abs - prev_vel_abs).unity() * const.MAX_ACCELERATION * (
-                        now - cur_robot.prev_sended_time
-                    )
+                    current_action.vel = prev_vel_abs + (cur_vel_abs - prev_vel_abs).unity() * const.MAX_ACCELERATION * dt
 
             # current_action.vel = aux.Point(0,500)
             cur_robot.prev_sended_vel = current_action.vel
@@ -106,6 +106,7 @@ class Actions:
             perform_ball_placement: bool = False,
             target_vel: aux.Point = aux.Point(0, 0),
             ignore_robots: dict[const.Color, list[int]] = {},
+            avoid_ball: Optional[bool] = None,
         ) -> None:
             self.target_pos = target_pos
             self.target_angle = target_angle
@@ -114,6 +115,7 @@ class Actions:
             self.target_vel = target_vel
             self.perform_ball_placement = perform_ball_placement
             self.ignore_robots = ignore_robots
+            self.avoid_ball = avoid_ball  # None - автоматически по состоянию игры, True/False - явно
 
         def use_behavior_of(self, domain: ActionDomain, current_action: ActionValues) -> list["Action"]:
             avoid_ball = (
@@ -121,6 +123,8 @@ class Actions:
                 or (domain.game_state in [GameStates.FREE_KICK, GameStates.KICKOFF] and not domain.we_active)
                 or (domain.game_state == GameStates.BALL_PLACEMENT and not self.perform_ball_placement)
             )
+            if self.avoid_ball is not None:
+                avoid_ball = self.avoid_ball
             ball_placement_target = domain.field.ball_placement_pos if (not self.perform_ball_placement) else None
             if not self.perform_ball_placement:
                 self.target_pos, self.target_vel = correct_target_pos(
@@ -162,9 +166,10 @@ class Actions:
     class BallGrab(Action):
         """Grab ball in a given direction"""
 
-        def __init__(self, target_angle: float, *, perform_ball_placement: bool = False) -> None:
+        def __init__(self, target_angle: float, *, perform_ball_placement: bool = False, dribbler_speed: int = 15) -> None:
             self.target_angle = target_angle
             self.perform_ball_placement = perform_ball_placement
+            self.dribbler_speed = dribbler_speed
 
         def is_defined(self, domain: ActionDomain) -> bool:
             return (
@@ -195,7 +200,7 @@ class Actions:
             current_action.vel = transl_vel
             current_action.angle = self.target_angle
 
-            current_action.dribbler_speed = 15
+            current_action.dribbler_speed = self.dribbler_speed
 
         def use_behavior_of(self, domain: ActionDomain, current_action: ActionValues) -> list["Action"]:
             ball_pos = domain.field.ball.get_pos()

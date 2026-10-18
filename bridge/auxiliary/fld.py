@@ -70,9 +70,13 @@ class Goal:
         self.wall_hull = aux.offset_polygon(self.hull, const.ROBOT_R * 1.2)
         self.big_hull = aux.offset_polygon(self.hull, const.ROBOT_R * 1.2)
 
-        stop_delta = 600
+        stop_delta = const.STOP_AREA_DELTA
         self.stop_hull = aux.offset_polygon(self.hull, stop_delta)
         self.big_stop_hull = aux.offset_polygon(self.stop_hull, const.ROBOT_R * 1.2)
+
+        # Зона, запрещённая центру робота у чужой штрафной, пока мяч не в игре (8.4.1, R-0.4)
+        self.ball_out_hull = aux.offset_polygon(self.hull, const.DEF_AREA_MARGIN_BALL_OUT)
+        self.big_ball_out_hull = aux.offset_polygon(self.ball_out_hull, const.ROBOT_R * 1.2)
 
 
 class Field:
@@ -187,6 +191,8 @@ class Field:
         self.small_hull = aux.offset_polygon(self.hull, -const.ROBOT_R)
         self.so_small_hull = aux.offset_polygon(self.hull, -const.ROBOT_R * 1.2)
         self.big_hull = aux.offset_polygon(self.hull, const.ROBOT_R)
+        # Допустимая область целей роботов (R-0.8): поле + зона выбега
+        self.target_hull = aux.offset_polygon(self.hull, const.FIELD_OUT_MARGIN)
 
         self._active_allies: list[rbt.Robot] = []
         self._active_enemies: list[rbt.Robot] = []
@@ -393,6 +399,35 @@ class Field:
             "SR",
         )
         return inter is not None and self.is_ball_moves()
+
+
+BALL_NOT_IN_PLAY_STATES = (
+    const.State.HALT,
+    const.State.TIMEOUT,
+    const.State.STOP,
+    const.State.PREPARE_KICKOFF,
+    const.State.KICKOFF,
+    const.State.FREE_KICK,
+    const.State.PREPARE_PENALTY,
+    const.State.BALL_PLACEMENT,
+)
+
+
+def is_ball_not_in_play(state: const.State) -> bool:
+    """
+    Мяч не в игре (Регламент 5.4): игра остановлена или стандарт ещё не разыгран.
+    KICKOFF и FREE_KICK переходят в RUN, как только мяч введён в игру.
+    """
+    return state in BALL_NOT_IN_PLAY_STATES
+
+
+def enemy_area_hulls(goal: Goal, state: const.State) -> tuple[list[aux.Point], list[aux.Point]]:
+    """Запрещённая зона у чужой штрафной и зона для выхода из неё в зависимости от состояния игры"""
+    if state == const.State.STOP:
+        return goal.stop_hull, goal.big_stop_hull
+    if is_ball_not_in_play(state):
+        return goal.ball_out_hull, goal.big_ball_out_hull
+    return goal.hull, goal.big_hull
 
 
 def find_nearest_robot(point: aux.Point, team: list[rbt.Robot], avoid: Optional[list[int]] = None) -> rbt.Robot:

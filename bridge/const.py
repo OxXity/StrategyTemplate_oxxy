@@ -176,9 +176,27 @@ match DIV:
 # ROUTE CONSTS
 VIEW_DIST = 2500
 if DIV == Div.C:
-    KEEP_BALL_DIST = 300 + ROBOT_R
+    # Регламент 5.1.1, 8.4.3: 0.5 м от корпуса до мяча + запас 60 мм (между центрами)
+    KEEP_BALL_DIST = 500 + ROBOT_R + 60
 else:
     KEEP_BALL_DIST = 500 + ROBOT_R
+
+# RULES SAFETY (общие для роутера и стратегии; стратегия берёт их через bridge/strategy/params.py)
+# STOP: роутер объезжает чужую штрафную с этим отступом (fld.Goal.stop_hull)
+STOP_AREA_DELTA = 600
+# 8.4.1: центр робота не ближе 0.2 м + ROBOT_R + запас к чужой штрафной, пока мяч не в игре
+DEF_AREA_MARGIN_BALL_OUT = 200 + ROBOT_R + 60
+# R-0.8: цели роботов можно ставить за линиями поля не дальше этого (зона выбега)
+FIELD_OUT_MARGIN = 120
+# 8.4.2: столкновения; порог относительной скорости сближения (правило 1500) с запасом
+COLLISION_SAFE_REL_SPEED = 1100
+COLLISION_GUARD_DIST = 2 * ROBOT_R + 300
+# Слабый дриблер: рампа угла сбрасывается, если не обновлялась дольше, с
+CARRY_RAMP_RESET_TIME = 0.2
+# Слабый дриблер: уставка угла не уходит от реального угла робота дальше, рад
+CARRY_SP_MAX_LAG = 0.6
+# Слабый дриблер: точка разворота обновляется, если мяч сместился дальше, мм
+PIVOT_UPDATE_DIST = 30
 
 # is_ball_in
 GRAB_ALIGN_DIST = ROBOT_R + BALL_R

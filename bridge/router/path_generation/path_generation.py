@@ -257,7 +257,7 @@ def correct_target_pos(
 ) -> tuple[aux.Point, aux.Point]:
     """Correct target position"""
     ball_pos = field.ball.get_pos()
-    field_hull = field.big_hull
+    field_hull = field.target_hull
     if not aux.is_point_inside_poly(target, field_hull):
         target = aux.nearest_point_on_poly(target, field_hull)
         target_vel = aux.Point(0, 0)
@@ -320,18 +320,21 @@ def correct_target_pos(
             target = aux.nearest_point_on_poly(target, field.enemy_goal.big_hull)
             target_vel = aux.Point(0, 0)
 
-    if not aux.is_point_inside_poly(target, field.so_small_hull):
-        target = aux.nearest_point_on_poly(target, field.so_small_hull)
+        # R-0.4: пока мяч не в игре, держим цели дальше от чужой штрафной
+        _, enemy_big_hull_avoid = fld.enemy_area_hulls(field.enemy_goal, field.game_state)
+        if aux.is_point_inside_poly(target, enemy_big_hull_avoid):
+            target = aux.nearest_point_on_poly(target, enemy_big_hull_avoid)
+            target_vel = aux.Point(0, 0)
+
+    if not aux.is_point_inside_poly(target, field.target_hull):
+        target = aux.nearest_point_on_poly(target, field.target_hull)
         target_vel = aux.Point(0, 0)
 
     return target, target_vel
 
 
 def avoid_goal_zone(field: fld.Field, robot: rbt.Robot, next_point: aux.Point) -> Optional[aux.Point]:
-    enemy_hull_avoid = field.enemy_goal.hull if not field.game_state == const.State.STOP else field.enemy_goal.stop_hull
-    enemy_big_hull_avoid = (
-        field.enemy_goal.big_hull if not field.game_state == const.State.STOP else field.enemy_goal.big_stop_hull
-    )
+    enemy_hull_avoid, enemy_big_hull_avoid = fld.enemy_area_hulls(field.enemy_goal, field.game_state)
 
     if aux.is_point_inside_poly(robot.get_pos(), field.ally_goal.hull):
         next_point = aux.nearest_point_on_poly(robot.get_pos(), field.ally_goal.big_hull)

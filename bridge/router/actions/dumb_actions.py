@@ -52,6 +52,9 @@ class DumbActions:
         def behavior(self, domain: ActionDomain, current_action: ActionValues) -> None:
             if self.pass_pos is not None:
                 self.voltage = get_pass_voltage(aux.dist(domain.field.ball.get_pos(), self.pass_pos), self.is_upper)
+                if not self.is_upper:
+                    # R-0.5: напряжение паса не выше удара, иначе мяч быстрее 3 м/с (Регламент 8.4.2)
+                    self.voltage = min(self.voltage, const.VOLTAGE_SHOOT)
 
             current_action.kicker_voltage = self.voltage
             # NOTE test 15 when is_pass
