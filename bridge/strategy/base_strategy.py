@@ -5,7 +5,7 @@ from typing import Optional
 from bridge import const
 from bridge.auxiliary import fld
 from bridge.const import State as GameStates
-from bridge.router.actions import Action
+from bridge.router.actions import Action, Actions
 
 
 class BaseStrategy:
@@ -35,7 +35,7 @@ class BaseStrategy:
             case GameStates.TIMEOUT:
                 self.timeout(field, actions)
             case GameStates.HALT:
-                return [None] * const.TEAM_ROBOTS_MAX_COUNT
+                return [Actions.Stop()] * const.TEAM_ROBOTS_MAX_COUNT
             case GameStates.PREPARE_PENALTY:
                 self.prepare_penalty(field, actions)
             case GameStates.PENALTY:

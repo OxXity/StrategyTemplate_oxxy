@@ -122,9 +122,12 @@ class Attacker:
         else:
             target = geom.intercept_point(field, robot.get_pos())
         target = geom.out_of_zone(geom.out_of_zone(target, field.enemy_goal), field.ally_goal)
-        # the ball comes along -vel: face it, turned to the goal
+        # the ball comes along -vel: face it, turned to the goal (straight to the ball when it is close)
         ball_from = target - ball_vel.unity() * 1000
-        angle = geom.receive_angle(target, ball_from, field.enemy_goal.center)
+        if aux.dist(ctx.ball, target) < cfg.RECEIVE_FACE_DIST:
+            angle = aux.angle_to_point(target, ball_from)
+        else:
+            angle = geom.receive_angle(target, ball_from, field.enemy_goal.center)
         return Actions.GoToPoint(target, angle, ball_catch=True).compose(Actions.SetDribblerSpeed(15))
 
     def is_stuck(self, ctx: Context, robot: rbt.Robot) -> bool:

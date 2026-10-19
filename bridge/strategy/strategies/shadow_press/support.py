@@ -56,7 +56,7 @@ class ReceivePoint:
         # not too close to the ball (and to S), not too far for a pass
         d = aux.dist(ctx.ball, point)
         if d < cfg.RECEIVE_MIN_DIST:
-            value -= (cfg.RECEIVE_MIN_DIST - d) * 3
+            value -= (cfg.RECEIVE_MIN_DIST - d) * cfg.RECEIVE_MIN_DIST_K
         if d > cfg.RECEIVE_MAX_DIST:
             value -= (d - cfg.RECEIVE_MAX_DIST) * 2
 

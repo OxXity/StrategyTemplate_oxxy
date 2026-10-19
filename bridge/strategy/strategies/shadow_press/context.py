@@ -90,6 +90,8 @@ class Context:
             target = self.receive_point
         if aux.is_point_inside_poly(target, self.field.ally_goal.big_hull):
             return None
+        if aux.dist(src, target) < cfg.PASS_MIN_DIST:
+            return None
         if self.forward is not None and aux.dist(target, self.forward.get_pos()) < cfg.PASS_SAFE_DIST:
             return None
         others = [r for r in self.obstacles(passer) if r != self.attacker]

@@ -87,14 +87,17 @@ class ShadowPressStrategy(BaseStrategy):
         return current
 
     def choose_ball_taker(self, ctx: Context) -> Optional[str]:
-        """A free ball on our half (out of the zone) is taken by the closer of S and A"""
+        """
+        A free ball on our half (out of the zone) is taken by the closer of S and A (S is preferred),
+        on their half S takes only the ball close to it
+        """
         field = ctx.field
         if (
             ctx.shadow is None
             or ctx.attacker is None
             or field.robot_with_ball is not None
-            or not geom.in_ally_half(field, ctx.ball)
             or aux.is_point_inside_poly(ctx.ball, field.ally_goal.hull)
+            or aux.is_point_inside_poly(ctx.ball, field.enemy_goal.hull)
         ):
             self.ball_taker = None
             return None
@@ -103,7 +106,10 @@ class ShadowPressStrategy(BaseStrategy):
         def reach(robot: rbt.Robot) -> float:
             return aux.dist(robot.get_pos(), geom.intercept_point(field, robot.get_pos()))
 
-        d_s, d_a = reach(ctx.shadow), reach(ctx.attacker)
+        d_s, d_a = reach(ctx.shadow) - cfg.S_TAKER_BONUS, reach(ctx.attacker)
+        if not geom.in_ally_half(field, ctx.ball) and (d_s + cfg.S_TAKER_BONUS > cfg.S_TAKE_DIST or d_a < d_s):
+            self.ball_taker = None
+            return None
         if self.ball_taker == "S" and d_a + cfg.TAKER_HYST < d_s:
             self.ball_taker = "A"
         elif self.ball_taker == "A" and d_s + cfg.TAKER_HYST < d_a:
@@ -250,6 +256,7 @@ class ShadowPressStrategy(BaseStrategy):
             (ctx.gk, "G", self.goalkeeper.state),
             (ctx.shadow, "S", self.shadow.state),
             (ctx.attacker, "A", self.attacker.state),
+            *((robot, "X", "EXTRA") for robot in self.extra),
         ]
         for robot, role, state in labels:
             if robot is not None:

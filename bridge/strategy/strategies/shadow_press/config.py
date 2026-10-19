@@ -8,7 +8,7 @@ from bridge import const
 # ROLES (goalkeeper id is GK from .env)
 # Fixed ids of robots; None or an absent robot -> the role is given to a free robot
 SHADOW_ID: Optional[int] = 1
-ATTACKER_ID: Optional[int] = 2
+ATTACKER_ID: Optional[int] = 4
 # Robot that takes our penalty; None -> attacker
 PENALTY_KICKER_ID: Optional[int] = None
 
@@ -37,7 +37,7 @@ SHADOW_K = 0.25
 
 # ATTACKER
 ATTACKER_GK_BLOCK_DIST = 600  # distance from the ball on the line "ball -> F" when the ball is at their GK
-SHOT_DIST = 1800  # max distance to the goal for a shot
+SHOT_DIST = 2500  # max distance to the goal for a shot
 MIN_WINDOW = 2 * const.BALL_R + 80  # min width of a free window in the goal
 DRIBBLE_STEP = 600  # length of one push when dribbling
 STUCK_TIME = 2.0  # stuck longer -> shoot as is
@@ -51,7 +51,8 @@ RECEIVE_X_MIN = -300  # grid of points along x (to their goal): from this ...
 RECEIVE_ZONE_GAP = 400  # ... to their zone minus this
 RECEIVE_Y = 1100  # grid along y: [-RECEIVE_Y, RECEIVE_Y]
 RECEIVE_AHEAD = 300  # the point is ahead of the ball at least by this (if possible)
-RECEIVE_MIN_DIST = 1000  # distance from the ball to the point
+RECEIVE_MIN_DIST = 1400  # distance from the ball to the point
+RECEIVE_MIN_DIST_K = 5  # penalty for the point closer than RECEIVE_MIN_DIST (score per mm)
 RECEIVE_MAX_DIST = 2200
 RECEIVE_TRAVEL_K = 0.4  # penalty for the way of A to the point (score per mm)
 RECEIVE_HYST = 300  # the point is changed only if a new one is better by this score
@@ -60,7 +61,8 @@ RECEIVE_WAIT_DIST = 2500  # A is closer to the point -> S may wait for it
 RECEIVE_SIDE_FREE = 700  # |y| of the receive point without penalty ...
 RECEIVE_SIDE_K = 2.0  # ... farther to the side line: penalty per mm
 RECEIVE_TURN_K = 600  # penalty of the receive point for the turn after receiving (score per rad)
-RECEIVE_ANGLE_OFFSET = math.radians(35)  # A receives the ball turned to the goal by this angle (dribbler still catches)
+RECEIVE_ANGLE_OFFSET = math.radians(15)  # A receives the ball turned to the goal by this angle (dribbler still catches)
+RECEIVE_FACE_DIST = 1000  # the pass is closer than this to A -> face the ball straight (no turn to the goal)
 RECEIVE_LINE_DIST = 800  # A shifts along the pass line to receive the ball, if it is closer than this
 TURN_WITH_BALL_ANGLE = 0.35  # A with the ball turns smoothly (without kick) if the kick angle differs more
 TURN_LOOKAHEAD = 0.3  # step of the smooth turn with the ball, rad (speed = angle gain * step)
@@ -69,10 +71,13 @@ S_HOLD_SAFE = 600  # S doesn't hold the ball if an enemy is closer than this
 
 # EXCHANGE S <-> A
 TAKER_HYST = 200  # hysteresis of choosing the robot for a free ball
+S_TAKER_BONUS = 300  # S takes the free ball even if it is farther than A by this
+S_TAKE_DIST = 800  # S takes the free ball closer than this also on their half
 FORWARD_HYST = 300  # hysteresis of choosing the enemy forward F
 
 # PASSES
 PASS_SAFE_DIST = 800  # pass to A only if A is farther from F than this
+PASS_MIN_DIST = 900  # don't pass to A closer than this (too fast ball at a short distance)
 PASS_LINE_MARGIN = const.ROBOT_R + const.BALL_R + 30  # robot closer to the pass line blocks it
 CLEAR_X_K = 0.55  # x of the clearance point = enemy_goal.x * CLEAR_X_K
 CLEAR_Y_OFFSET = 400  # clearance point: distance from the side line
